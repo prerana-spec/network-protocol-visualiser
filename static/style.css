@@ -1,0 +1,36 @@
+* { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+body { background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+header { text-align: center; margin-bottom: 20px; }
+header h1 { margin: 0; color: #38bdf8; }
+
+.dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1400px; margin: 0 auto; }
+@media(max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+
+.panel { background: #1e293b; border-radius: 8px; padding: 20px; border: 1px solid #334155; }
+.tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+.tab-btn { background: #334155; border: none; color: white; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
+.tab-btn.active { background: #0284c7; }
+
+.tab-content { display: none; flex-direction: column; gap: 10px; }
+.tab-content.active { display: flex; }
+
+input, select, textarea { background: #0f172a; border: 1px solid #475569; color: white; padding: 8px; border-radius: 4px; }
+button { background: #0284c7; border: none; color: white; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+button:hover { background: #0369a1; }
+
+.activity-log { margin-top: 20px; background: #0f172a; padding: 10px; border-radius: 4px; min-height: 100px; }
+
+/* Right Panel Styles */
+.controls { display: flex; gap: 10px; margin-bottom: 15px; }
+.network-diagram { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 4px; position: relative; margin-bottom: 15px; }
+.node { background: #334155; padding: 10px 15px; border-radius: 4px; font-weight: bold; }
+.arrow-container { flex-grow: 1; position: relative; height: 30px; margin: 0 10px; }
+.packet { position: absolute; background: #eab308; color: black; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; transition: all 0.5s ease-in-out; }
+.packet.hidden { display: none; }
+
+.timeline { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; margin-bottom: 15px; }
+.step-card { background: #0f172a; border-left: 4px solid #475569; padding: 8px 12px; cursor: pointer; border-radius: 0 4px 4px 0; }
+.step-card.active { border-left-color: #38bdf8; background: #1e293b; }
+
+.raw-inspector { background: #0f172a; padding: 10px; border-radius: 4px; border: 1px solid #334155; }
+pre { margin: 0; white-space: pre-wrap; font-family: monospace; color: #a5f3fc; }

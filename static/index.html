@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Layer Protocol Visualizer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>Application Layer Activity & Protocol Visualizer</h1>
+        <p>Interactive Computer Networks Dashboard</p>
+    </header>
+
+    <main class="dashboard">
+        <!-- LEFT PANEL: Activities -->
+        <section class="panel left-panel">
+            <h2>Activity Panel</h2>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('browsing')">Browsing</button>
+                <button class="tab-btn" onclick="switchTab('mail')">Mail</button>
+                <button class="tab-btn" onclick="switchTab('streaming')">Streaming</button>
+            </div>
+
+            <!-- Browsing Form -->
+            <div id="browsing" class="tab-content active">
+                <label>Target URL:</label>
+                <input type="text" id="browse-url" value="https://example.com/index.html">
+                <button onclick="runBrowse()">Visit Page</button>
+            </div>
+
+            <!-- Mail Form -->
+            <div id="mail" class="tab-content">
+                <label>To:</label>
+                <input type="email" id="mail-to" value="professor@university.edu">
+                <label>Subject:</label>
+                <input type="text" id="mail-subject" value="Assignment Submission">
+                <label>Body:</label>
+                <textarea id="mail-body">Sending network assignment protocol simulation.</textarea>
+                <button onclick="runMail()">Send Email</button>
+            </div>
+
+            <!-- Streaming Form -->
+            <div id="streaming" class="tab-content">
+                <label>Stream Quality:</label>
+                <select id="stream-quality">
+                    <option value="1080p">1080p High Definition</option>
+                    <option value="720p">720p Medium Definition</option>
+                    <option value="480p">480p Low Definition</option>
+                </select>
+                <button onclick="runStream()">Start Stream</button>
+            </div>
+
+            <div class="activity-log">
+                <h3>Activity Log</h3>
+                <div id="log-output">Select an activity to begin...</div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: Protocol Visualization -->
+        <section class="panel right-panel">
+            <h2>Protocol Visualization Panel</h2>
+            
+            <div class="controls">
+                <button onclick="prevStep()">⏮ Previous</button>
+                <button onclick="togglePlay()" id="play-btn">▶ Play</button>
+                <button onclick="nextStep()">Next ⏭</button>
+                <button onclick="resetTimeline()">🔄 Replay</button>
+            </div>
+
+            <div class="network-diagram">
+                <div class="node">Client (Browser)</div>
+                <div class="arrow-container">
+                    <div id="packet" class="packet hidden">Packet</div>
+                </div>
+                <div class="node">Server (Remote)</div>
+            </div>
+
+            <div class="timeline" id="timeline">
+                <p>Run an activity to view application layer exchange (DNS, HTTP, SMTP).</p>
+            </div>
+
+            <div class="raw-inspector">
+                <h3>Message Inspector</h3>
+                <pre id="raw-details">Select a step to inspect protocol headers...</pre>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
