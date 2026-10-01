@@ -2,15 +2,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import os
 
-app = FastAPI(title="Protocol Visualizer Dashboard")
+app = FastAPI(title="Dual-Panel Network Protocol Visualizer")
 
-# Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def read_root():
-    return FileResponse("static/index.html")
+    return FileResponse(os.path.join("static", "index.html"))
 
 class BrowseRequest(BaseModel):
     url: str
@@ -25,303 +25,77 @@ class StreamRequest(BaseModel):
 
 @app.post("/api/simulate/browse")
 def simulate_browse(req: BrowseRequest):
-    domain = req.url.replace("https://", "").replace("http://", "").split('/')[0] or "example.com"
-    return {
-        "activity": "Browsing",
-        "details": f"Visited: {req.url}",
-        "steps": [
-            {
-                "id": 1,
-                "protocol": "DNS Query",
-                "direction": "client-to-server",
-                "summary": f"Standard query A {domain}",
-                "raw": f"DNS Header: ID 0x82f1, Flags 0x0100 (Standard Query)\nQuestion: {domain} IN A"
-            },
-            {
-                "id": 2,
-                "protocol": "DNS Response",
-                "direction": "server-to-client",
-                "summary": f"Standard response A {domain} -> 93.184.216.34",
-                "raw": f"DNS Header: ID 0x82f1, Flags 0x8180 (No error)\nAnswer: {domain} -> 93.184.216.34 (TTL 300)"
-            },
-            {
-                "id": 3,
-                "protocol": "TCP SYN",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [SYN]",
-                "raw": "Client -> Server [SYN] Seq=0 Win=64240 Len=0 MSS=1460 (Port 80)"
-            },
-            {
-                "id": 4,
-                "protocol": "TCP SYN-ACK",
-                "direction": "server-to-client",
-                "summary": "TCP Handshake [SYN, ACK]",
-                "raw": "Server -> Client [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=1460"
-            },
-            {
-                "id": 5,
-                "protocol": "TCP ACK",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [ACK]",
-                "raw": "Client -> Server [ACK] Seq=1 Ack=1 Win=64240 Len=0"
-            },
-            {
-                "id": 6,
-                "protocol": "HTTP Request",
-                "direction": "client-to-server",
-                "summary": f"GET / HTTP/1.1",
-                "raw": f"GET / HTTP/1.1\r\nHost: {domain}\r\nUser-Agent: VisualizerBrowser/1.0\r\nAccept: text/html\r\n\r\n"
-            },
-            {
-                "id": 7,
-                "protocol": "HTTP Response",
-                "direction": "server-to-client",
-                "summary": "HTTP/1.1 200 OK",
-                "raw": "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 1256\r\nServer: ECS (scl/e05b)\r\n\r\n<!DOCTYPE html><html>...</html>"
-            }
-        ]
-    }
+    domain = req.url.split("//")[-1].split("/")[0] if "//" in req.url else req.url.split("/")[0]
+    path = "/" + "/".join(req.url.split("/")[1:]) if "/" in req.url else "/"
+    
+    steps = [
+        # Application: DNS
+        {"id": 1, "layer": "app", "protocol": "DNS", "direction": "client-to-server", "summary": f"DNS Query: Where is {domain}?", "raw": f"DNS Standard Query A {domain}"},
+        {"id": 2, "layer": "app", "protocol": "DNS", "direction": "server-to-client", "summary": "DNS Response: 93.184.216.34", "raw": f"DNS Response: {domain} A 93.184.216.34 (TTL 300)"},
+        
+        # Transport: TCP Handshake
+        {"id": 3, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Handshake: SYN", "raw": "Flags: [SYN] | Seq: 1000 | Ack: 0 | Win: 64240 | Len: 0", "seq": 1000, "ack": 0, "flags": "SYN", "win": 64240},
+        {"id": 4, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Handshake: SYN-ACK", "raw": "Flags: [SYN, ACK] | Seq: 5000 | Ack: 1001 | Win: 65535 | Len: 0", "seq": 5000, "ack": 1001, "flags": "SYN-ACK", "win": 65535},
+        {"id": 5, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Handshake: ACK", "raw": "Flags: [ACK] | Seq: 1001 | Ack: 5001 | Win: 64240 | Len: 0", "seq": 1001, "ack": 5001, "flags": "ACK", "win": 64240},
+        
+        # Application & Transport Data Stream
+        {"id": 6, "layer": "app", "protocol": "HTTP", "direction": "client-to-server", "summary": f"HTTP GET {path}", "raw": f"GET {path} HTTP/1.1\r\nHost: {domain}\r\nUser-Agent: Mozilla/5.0\r\nAccept: text/html\r\n\r\n"},
+        {"id": 7, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Data Segment (HTTP Request)", "raw": "Flags: [PSH, ACK] | Seq: 1001 | Ack: 5001 | Win: 64240 | Len: 120", "seq": 1001, "ack": 5001, "flags": "PSH-ACK", "win": 64240},
+        {"id": 8, "layer": "app", "protocol": "HTTP", "direction": "server-to-client", "summary": "HTTP 200 OK (Response)", "raw": "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 1256\r\n\r\n<!DOCTYPE html><html>...</html>"},
+        {"id": 9, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Data Segment (HTTP Body)", "raw": "Flags: [PSH, ACK] | Seq: 5001 | Ack: 1121 | Win: 65535 | Len: 1256", "seq": 5001, "ack": 1121, "flags": "PSH-ACK", "win": 65535},
+        
+        # Transport: TCP Teardown
+        {"id": 10, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Teardown: FIN-ACK", "raw": "Flags: [FIN, ACK] | Seq: 1121 | Ack: 6257 | Win: 64240 | Len: 0", "seq": 1121, "ack": 6257, "flags": "FIN-ACK", "win": 64240},
+        {"id": 11, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Teardown: ACK", "raw": "Flags: [ACK] | Seq: 6257 | Ack: 1122 | Win: 65535 | Len: 0", "seq": 6257, "ack": 1122, "flags": "ACK", "win": 65535}
+    ]
+    return {"activity": "Browsing", "details": f"Loaded web content from {domain}", "steps": steps}
 
 @app.post("/api/simulate/mail")
 def simulate_mail(req: MailRequest):
-    mail_domain = req.to.split('@')[-1] if '@' in req.to else 'smtp-server.com'
-    return {
-        "activity": "Mail",
-        "details": f"Sent mail to {req.to}",
-        "steps": [
-            # 1. DNS Resolution
-            {
-                "id": 1,
-                "protocol": "DNS Query",
-                "direction": "client-to-server",
-                "summary": f"Query MX mail.{mail_domain}",
-                "raw": f"DNS Query: ID 0x1a2b, Query MX mail.{mail_domain}"
-            },
-            {
-                "id": 2,
-                "protocol": "DNS Response",
-                "direction": "server-to-client",
-                "summary": f"MX response -> mail.{mail_domain} [192.0.2.25]",
-                "raw": f"DNS Response: ID 0x1a2b, MX 10 mail.{mail_domain} -> 192.0.2.25"
-            },
-            # 2. TCP Handshake
-            {
-                "id": 3,
-                "protocol": "TCP SYN",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [SYN]",
-                "raw": "Client -> Mail Server [SYN] Seq=0 Win=64240 Len=0 MSS=1460 (Port 25)"
-            },
-            {
-                "id": 4,
-                "protocol": "TCP SYN-ACK",
-                "direction": "server-to-client",
-                "summary": "TCP Handshake [SYN, ACK]",
-                "raw": "Mail Server -> Client [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0"
-            },
-            {
-                "id": 5,
-                "protocol": "TCP ACK",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [ACK]",
-                "raw": "Client -> Mail Server [ACK] Seq=1 Ack=1 Win=64240 Len=0"
-            },
-            # 3. SMTP Exchange
-            {
-                "id": 6,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": f"220 mail.{mail_domain} ESMTP Service Ready",
-                "raw": f"S: 220 mail.{mail_domain} ESMTP Service Ready"
-            },
-            {
-                "id": 7,
-                "protocol": "SMTP EHLO",
-                "direction": "client-to-server",
-                "summary": "EHLO client.local",
-                "raw": "C: EHLO client.local"
-            },
-            {
-                "id": 8,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "250 Hello Client, pleased to meet you",
-                "raw": "S: 250-mail.smtp-server.com\r\nS: 250-PIPELINING\r\nS: 250 8BITMIME"
-            },
-            {
-                "id": 9,
-                "protocol": "SMTP MAIL FROM",
-                "direction": "client-to-server",
-                "summary": "MAIL FROM:<user@localdomain>",
-                "raw": "C: MAIL FROM:<user@localdomain>"
-            },
-            {
-                "id": 10,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "250 2.1.0 Sender OK",
-                "raw": "S: 250 2.1.0 Sender OK"
-            },
-            {
-                "id": 11,
-                "protocol": "SMTP RCPT TO",
-                "direction": "client-to-server",
-                "summary": f"RCPT TO:<{req.to}>",
-                "raw": f"C: RCPT TO:<{req.to}>"
-            },
-            {
-                "id": 12,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "250 2.1.5 Recipient OK",
-                "raw": "S: 250 2.1.5 Recipient OK"
-            },
-            {
-                "id": 13,
-                "protocol": "SMTP DATA",
-                "direction": "client-to-server",
-                "summary": "DATA payload initiation",
-                "raw": "C: DATA"
-            },
-            {
-                "id": 14,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "354 Start mail input; end with <CR><LF>.<CR><LF>",
-                "raw": "S: 354 End data with <CR><LF>.<CR><LF>"
-            },
-            {
-                "id": 15,
-                "protocol": "SMTP DATA",
-                "direction": "client-to-server",
-                "summary": "Send Body Content",
-                "raw": f"C: Subject: {req.subject}\r\n\r\n{req.body}\r\n."
-            },
-            {
-                "id": 16,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "250 2.0.0 Message queued for delivery",
-                "raw": "S: 250 2.0.0 Ok: queued as 4SyXzL087z1"
-            },
-            {
-                "id": 17,
-                "protocol": "SMTP QUIT",
-                "direction": "client-to-server",
-                "summary": "QUIT session close",
-                "raw": "C: QUIT"
-            },
-            {
-                "id": 18,
-                "protocol": "SMTP Response",
-                "direction": "server-to-client",
-                "summary": "221 2.0.0 Bye",
-                "raw": "S: 221 2.0.0 Service closing transmission channel"
-            },
-            # 4. TCP Teardown
-            {
-                "id": 19,
-                "protocol": "TCP FIN",
-                "direction": "client-to-server",
-                "summary": "TCP Teardown [FIN, ACK]",
-                "raw": "Client -> Mail Server [FIN, ACK] Seq=240 Ack=185 Win=64240"
-            },
-            {
-                "id": 20,
-                "protocol": "TCP ACK",
-                "direction": "server-to-client",
-                "summary": "TCP Connection Closed [ACK]",
-                "raw": "Mail Server -> Client [ACK] Seq=185 Ack=241 Win=65535"
-            }
-        ]
-    }
+    steps = [
+        # Application: DNS lookup for MX
+        {"id": 1, "layer": "app", "protocol": "DNS", "direction": "client-to-server", "summary": "DNS MX Query: mail server address", "raw": f"DNS Query MX for domain of {req.to}"},
+        {"id": 2, "layer": "app", "protocol": "DNS", "direction": "server-to-client", "summary": "DNS Response: MX mail.university.edu", "raw": "DNS Answer MX 10 mail.university.edu (IP: 192.0.2.25)"},
+        
+        # Transport: TCP Handshake
+        {"id": 3, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Handshake: SYN", "raw": "Flags: [SYN] | Seq: 2000 | Ack: 0 | Win: 64240 | Len: 0", "seq": 2000, "ack": 0, "flags": "SYN", "win": 64240},
+        {"id": 4, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Handshake: SYN-ACK", "raw": "Flags: [SYN, ACK] | Seq: 7000 | Ack: 2001 | Win: 65535 | Len: 0", "seq": 7000, "ack": 2001, "flags": "SYN-ACK", "win": 65535},
+        {"id": 5, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Handshake: ACK", "raw": "Flags: [ACK] | Seq: 2001 | Ack: 7001 | Win: 64240 | Len: 0", "seq": 2001, "ack": 7001, "flags": "ACK", "win": 64240},
+        
+        # SMTP Exchange over TCP
+        {"id": 6, "layer": "app", "protocol": "SMTP", "direction": "server-to-client", "summary": "220 mail.university.edu ESMTP Ready", "raw": "220 mail.university.edu ESMTP Service Ready"},
+        {"id": 7, "layer": "app", "protocol": "SMTP", "direction": "client-to-server", "summary": "EHLO client.local", "raw": "EHLO client.local"},
+        {"id": 8, "layer": "app", "protocol": "SMTP", "direction": "client-to-server", "summary": f"MAIL FROM: <student@local.edu>", "raw": "MAIL FROM: <student@local.edu>"},
+        {"id": 9, "layer": "app", "protocol": "SMTP", "direction": "client-to-server", "summary": f"RCPT TO: <{req.to}>", "raw": f"RCPT TO: <{req.to}>"},
+        {"id": 10, "layer": "app", "protocol": "SMTP", "direction": "client-to-server", "summary": "DATA Payload Transmission", "raw": f"DATA\r\nSubject: {req.subject}\r\n\r\n{req.body}\r\n."},
+        {"id": 11, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Segment carrying SMTP DATA Payload", "raw": f"Flags: [PSH, ACK] | Seq: 2001 | Ack: 7001 | Win: 64240 | Len: {len(req.body)}", "seq": 2001, "ack": 7001, "flags": "PSH-ACK", "win": 64240},
+        {"id": 12, "layer": "app", "protocol": "SMTP", "direction": "server-to-client", "summary": "250 2.0.0 Message accepted for delivery", "raw": "250 2.0.0 OK 1728392019 Message Accepted"},
+        
+        # Transport: TCP Teardown
+        {"id": 13, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Teardown: FIN-ACK", "raw": "Flags: [FIN, ACK] | Seq: 2150 | Ack: 7050 | Win: 64240 | Len: 0", "seq": 2150, "ack": 7050, "flags": "FIN-ACK", "win": 64240},
+        {"id": 14, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Teardown: ACK", "raw": "Flags: [ACK] | Seq: 7050 | Ack: 2151 | Win: 65535 | Len: 0", "seq": 7050, "ack": 2151, "flags": "ACK", "win": 65535}
+    ]
+    return {"activity": "Mail", "details": f"Email delivered to {req.to}", "steps": steps}
 
 @app.post("/api/simulate/stream")
 def simulate_stream(req: StreamRequest):
-    return {
-        "activity": "Streaming",
-        "details": f"Quality: {req.quality}",
-        "steps": [
-            # 1. DNS Resolution
-            {
-                "id": 1,
-                "protocol": "DNS Query",
-                "direction": "client-to-server",
-                "summary": "Query cdn.stream.com",
-                "raw": "DNS Question: cdn.stream.com IN A"
-            },
-            {
-                "id": 2,
-                "protocol": "DNS Response",
-                "direction": "server-to-client",
-                "summary": "Response cdn.stream.com -> 198.51.100.42",
-                "raw": "DNS Answer: cdn.stream.com -> 198.51.100.42 (TTL 60)"
-            },
-            # 2. TCP Handshake
-            {
-                "id": 3,
-                "protocol": "TCP SYN",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [SYN]",
-                "raw": "Client -> CDN Server [SYN] Seq=0 Win=65535 Len=0 MSS=1460 (Port 443)"
-            },
-            {
-                "id": 4,
-                "protocol": "TCP SYN-ACK",
-                "direction": "server-to-client",
-                "summary": "TCP Handshake [SYN, ACK]",
-                "raw": "CDN Server -> Client [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0"
-            },
-            {
-                "id": 5,
-                "protocol": "TCP ACK",
-                "direction": "client-to-server",
-                "summary": "TCP Handshake [ACK]",
-                "raw": "Client -> CDN Server [ACK] Seq=1 Ack=1 Win=65535 Len=0"
-            },
-            # 3. HTTP HLS Fetching
-            {
-                "id": 6,
-                "protocol": "HTTP GET Manifest",
-                "direction": "client-to-server",
-                "summary": "GET /stream/playlist.m3u8",
-                "raw": f"GET /stream/{req.quality}/playlist.m3u8 HTTP/1.1\r\nHost: cdn.stream.com\r\nUser-Agent: HLSPlayer/2.0"
-            },
-            {
-                "id": 7,
-                "protocol": "HTTP Response Manifest",
-                "direction": "server-to-client",
-                "summary": "200 OK (HLS Playlist Manifest)",
-                "raw": "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.apple.mpegurl\r\n\r\n#EXTM3U\r\n#EXT-X-TARGETDURATION:4\r\n#EXTINF:4.0,\r\nchunk_1.ts"
-            },
-            {
-                "id": 8,
-                "protocol": "HTTP GET Segment 1",
-                "direction": "client-to-server",
-                "summary": f"GET /stream/segment1.ts ({req.quality})",
-                "raw": f"GET /stream/{req.quality}/seg1.ts HTTP/1.1\r\nHost: cdn.stream.com"
-            },
-            {
-                "id": 9,
-                "protocol": "HTTP Response Segment 1",
-                "direction": "server-to-client",
-                "summary": "200 OK (Media Stream Bytes)",
-                "raw": "HTTP/1.1 200 OK\r\nContent-Type: video/MP2T\r\nContent-Length: 1048576\r\n\r\n[Binary Segment Data - 1MB Chunk]"
-            },
-            # 4. TCP Teardown
-            {
-                "id": 10,
-                "protocol": "TCP FIN",
-                "direction": "client-to-server",
-                "summary": "TCP Teardown [FIN, ACK]",
-                "raw": "Client -> CDN Server [FIN, ACK] Seq=1049 Ack=2048"
-            },
-            {
-                "id": 11,
-                "protocol": "TCP ACK",
-                "direction": "server-to-client",
-                "summary": "TCP Connection Closed [ACK]",
-                "raw": "CDN Server -> Client [ACK] Seq=2048 Ack=1050"
-            }
-        ]
-    }
+    steps = [
+        # Application: DNS
+        {"id": 1, "layer": "app", "protocol": "DNS", "direction": "client-to-server", "summary": "DNS Query: cdn.streamvideo.com", "raw": "DNS Query A cdn.streamvideo.com"},
+        {"id": 2, "layer": "app", "protocol": "DNS", "direction": "server-to-client", "summary": "DNS Response: 198.51.100.12", "raw": "DNS Response: cdn.streamvideo.com A 198.51.100.12"},
+        
+        # Transport: TCP Handshake
+        {"id": 3, "layer": "transport", "protocol": "TCP", "direction": "client-to-server", "summary": "TCP Handshake: SYN", "raw": "Flags: [SYN] | Seq: 3000 | Ack: 0 | Win: 64240 | Len: 0", "seq": 3000, "ack": 0, "flags": "SYN", "win": 64240},
+        {"id": 4, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Handshake: SYN-ACK", "raw": "Flags: [SYN, ACK] | Seq: 8000 | Ack: 3001 | Win: 65535 | Len: 0", "seq": 8000, "ack": 3001, "flags": "SYN-ACK", "win": 65535},
+        
+        # App: Playlist Manifest Fetch (HLS)
+        {"id": 5, "layer": "app", "protocol": "HTTP/HLS", "direction": "client-to-server", "summary": "Fetch Playlist Manifest (.m3u8)", "raw": f"GET /stream/{req.quality}/master.m3u8 HTTP/1.1\r\nHost: cdn.streamvideo.com\r\n\r\n"},
+        {"id": 6, "layer": "app", "protocol": "HTTP/HLS", "direction": "server-to-client", "summary": f"Return {req.quality} Manifest Data", "raw": f"#EXTM3U\r\n#EXT-X-TARGETDURATION:4\r\n#EXTINF:4.0,\r\nsegment0.ts\r\n#EXTINF:4.0,\r\nsegment1.ts"},
+        
+        # Transport Data Segments
+        {"id": 7, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Video Chunk Transfer (Segment 0.ts)", "raw": "Flags: [ACK] | Seq: 8001 | Ack: 3100 | Win: 65535 | Len: 40960", "seq": 8001, "ack": 3100, "flags": "ACK", "win": 65535},
+        {"id": 8, "layer": "transport", "protocol": "UDP", "direction": "server-to-client", "summary": "[UDP Illustrative Alternative] Datagram Stream", "raw": "Src Port: 5004 | Dst Port: 40001 | Length: 1316 | Checksum: 0x41a2 (No reliable handshake/acknowledgments)"},
+        {"id": 9, "layer": "transport", "protocol": "TCP", "direction": "server-to-client", "summary": "TCP Video Chunk Transfer (Segment 1.ts)", "raw": "Flags: [ACK] | Seq: 48961 | Ack: 3100 | Win: 65535 | Len: 40960", "seq": 48961, "ack": 3100, "flags": "ACK", "win": 65535}
+    ]
+    return {"activity": "Streaming", "details": f"Streaming video content at {req.quality}", "steps": steps}
+           

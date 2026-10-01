@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Application Layer Protocol Visualizer</title>
+    <title>Application & Transport Layer Protocol Visualizer</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <header>
-        <h1>Application Layer Activity & Protocol Visualizer</h1>
-        <p>Interactive Computer Networks Dashboard</p>
+        <h1>Application & Transport Layer Protocol Visualizer</h1>
+        <p>Interactive Dual-Panel Computer Networks Dashboard</p>
     </header>
 
     <main class="dashboard">
@@ -61,6 +61,14 @@
         <section class="panel right-panel">
             <h2>Protocol Visualization Panel</h2>
             
+            <!-- Dual-View Toggle Filter (Required for Assignment 2) -->
+            <div class="view-toggle">
+                <label><strong>Layer View Filter:</strong></label>
+                <button class="layer-btn active" id="view-all" onclick="filterLayerView('all')">All Layers</button>
+                <button class="layer-btn" id="view-app" onclick="filterLayerView('app')">Application Layer</button>
+                <button class="layer-btn" id="view-transport" onclick="filterLayerView('transport')">Transport Layer</button>
+            </div>
+
             <div class="controls">
                 <button onclick="prevStep()">⏮ Previous</button>
                 <button onclick="togglePlay()" id="play-btn">▶ Play</button>
@@ -77,11 +85,11 @@
             </div>
 
             <div class="timeline" id="timeline">
-                <p>Run an activity to view application layer exchange (DNS, HTTP, SMTP).</p>
+                <p>Run an activity to view application and transport layer exchanges.</p>
             </div>
 
             <div class="raw-inspector">
-                <h3>Message Inspector</h3>
+                <h3>Message & Header Inspector</h3>
                 <pre id="raw-details">Select a step to inspect protocol headers...</pre>
             </div>
         </section>
